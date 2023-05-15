@@ -4,7 +4,7 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using Tesseract; // if no need change it also can be try ironocr
 using System.Diagnostics;
-
+using SkiaSharp;
 
 // Console.WriteLine("Hello, World!");
 
@@ -110,16 +110,58 @@ driver.SwitchTo().Frame(innerIframeElement);
 
 //Notice navigation is slightly different than the Java version
 //This is because 'get' is a keyword in C#
-IWebElement query = driver.FindElement(By.Name("search_string"));
-query.SendKeys("Cheese");
+IWebElement vkOrTcNo = driver.FindElement(By.Name("search_string"));
+IWebElement securityCode = driver.FindElement(By.Name("captcha_code"));
+
+IWebElement securityCodeImageElem = driver.FindElement(By.CssSelector("body > form > table > tbody > tr:nth-child(2) > td:nth-child(2) > img"));
+
+int x = securityCodeImageElem.Location.X;
+int y = securityCodeImageElem.Location.Y;
+int width = securityCodeImageElem.Size.Width;
+int height = securityCodeImageElem.Size.Height;
+
+Screenshot screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+
+ // Convert the screenshot to a byte array
+byte[] screenshotBytes = screenshot.AsByteArray;
+
+// Create a SKBitmap from the screenshot byte array
+using (MemoryStream stream = new MemoryStream(screenshotBytes))
+using (SKBitmap bitmap = SKBitmap.Decode(stream))
+{
+    // Define the region to crop
+    SKRectI cropRect = new SKRectI(x, y, width, height); // Replace with your desired values
+
+    // Create a new SKBitmap for the cropped image
+    using (SKBitmap croppedBitmap = new SKBitmap(cropRect.Width, cropRect.Height))
+    {
+        // Create a new SKCanvas from the cropped bitmap
+        using (SKCanvas canvas = new SKCanvas(croppedBitmap))
+        {
+            // Draw the cropped region onto the canvas
+            canvas.DrawBitmap(bitmap, cropRect, new SKRect(0, 0, cropRect.Width, cropRect.Height));
+        }
+
+        // Save the cropped bitmap to a file
+        using (FileStream fileStream = new FileStream("cropped_screenshot.png", FileMode.Create))
+        {
+            croppedBitmap.Encode(fileStream, SKEncodedImageFormat.Png, 100);
+        }
+    }
+}
+
+
+vkOrTcNo.SendKeys("Cheese");
 System.Console.WriteLine("Page title is: " + driver.Title);
 // driver.Quit();
-
+securityCode.SendKeys("Cheese");
 
 string imgDirPath = Directory.GetCurrentDirectory();
-string imgPath = Path.Combine(imgDirPath,"img.php");
+string imgPath = Path.Combine(imgDirPath, "ocr.png");
 
 
 string ocr = ConvertPythonOcr(imgPath);
+
+
 
 Console.WriteLine(ocr);
